@@ -25,10 +25,7 @@ jobs:
         aws-region: ${{ secrets.AWS_REGION }} 
 
     - name: Initialize Terraform
-      run: terraform init
-
-    - name: Destroying the code
-      run: terraform destroy --auto-approve     
+      run: terraform init  
 
     - name: Plan Terraform changes
       run: terraform plan

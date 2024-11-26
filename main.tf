@@ -9,14 +9,14 @@ data "aws_vpc" "selected" {
 
 data "aws_subnet" "subnet_a" {
   vpc_id             = data.aws_vpc.selected.id
-  availability_zone  = "us-east-1"
-  cidr_block         = "10.0.16.0/20"  # Adjust with your VPC's available CIDR
+  availability_zone  = "us-east-1a"
+  cidr_block         = "10.0.0.0/20"  # Adjust with your VPC's available CIDR
 }
 
 data "aws_subnet" "subnet_b" {
   vpc_id             = data.aws_vpc.selected.id
-  availability_zone  = "us-east-1a"
-  cidr_block         = "10.0.0.0/20"  # Adjust with your VPC's available CIDR
+  availability_zone  = "us-east-1b"
+  cidr_block         = "10.0.16.0/20"  # Adjust with your VPC's available CIDR
 }
 
 # Security Group

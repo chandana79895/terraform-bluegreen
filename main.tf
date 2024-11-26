@@ -11,6 +11,18 @@ data "aws_subnet" "selected" {
   vpc_id = data.aws_vpc.selected.id
 }
 
+data "aws_subnet" "subnet_a" {
+  vpc_id             = data.aws_vpc.selected.id
+  availability_zone  = "us-east-1"
+  cidr_block         = "10.0.16.0/20"  # Adjust with your VPC's available CIDR
+}
+
+data "aws_subnet" "subnet_b" {
+  vpc_id             = data.aws_vpc.selected.id
+  availability_zone  = "us-east-1a"
+  cidr_block         = "10.0.0.0/20"  # Adjust with your VPC's available CIDR
+}
+
 # Security Group
 resource "aws_security_group" "web_sg" {
   name        = "web-sg"
@@ -41,11 +53,14 @@ resource "aws_security_group" "web_sg" {
 
 # Application Load Balancer (ALB)
 resource "aws_lb" "web_lb" {
-  name               = "blue-green-lb"
+  name               = "web-load-balancer"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.web_sg.id]
-  subnets            = data.aws_subnet.selected.ids
+  subnets            = [
+    data.aws_subnet.subnet_a.id,
+    data.aws_subnet.subnet_b.id
+  ]  # Include both subnets in different AZs
 }
 
 # Target Groups
@@ -141,32 +156,32 @@ resource "aws_autoscaling_group" "blue_asg" {
   desired_capacity     = 1
   max_size             = 1
   min_size             = 1
-  vpc_zone_identifier  = data.aws_subnet.selected.ids
+  vpc_zone_identifier  = [
+    data.aws_subnet.subnet_a.id,
+    data.aws_subnet.subnet_b.id
+  ]
   launch_configuration = aws_launch_configuration.blue_launch_config.id
-  target_group_arns    = [aws_lb_target_group.blue_target_group.arn]
+
+  target_group_arns = [aws_lb_target_group.blue_target_group.arn]
 
   health_check_type          = "ELB"
-  health_check_grace_period  = 300
-
-  lifecycle {
-    create_before_destroy = true
-  }
+  health_check_grace_period = 300
 }
 
 resource "aws_autoscaling_group" "green_asg" {
   desired_capacity     = 1
   max_size             = 1
   min_size             = 1
-  vpc_zone_identifier  = data.aws_subnet.selected.ids
+  vpc_zone_identifier  = [
+    data.aws_subnet.subnet_a.id,
+    data.aws_subnet.subnet_b.id
+  ]
   launch_configuration = aws_launch_configuration.green_launch_config.id
-  target_group_arns    = [aws_lb_target_group.green_target_group.arn]
+
+  target_group_arns = [aws_lb_target_group.green_target_group.arn]
 
   health_check_type          = "ELB"
-  health_check_grace_period  = 300
-
-  lifecycle {
-    create_before_destroy = true
-  }
+  health_check_grace_period = 300
 }
 
 # ALB Listener Rules for Blue-Green Switching
@@ -174,13 +189,13 @@ resource "aws_lb_listener_rule" "switch_to_green" {
   listener_arn = aws_lb_listener.web_listener.arn
   priority     = 100
 
-  conditions {
+  condition {
     host_header {
       values = ["green.example.com"]
     }
   }
 
-  actions {
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.green_target_group.arn
   }
@@ -190,13 +205,13 @@ resource "aws_lb_listener_rule" "switch_to_blue" {
   listener_arn = aws_lb_listener.web_listener.arn
   priority     = 200
 
-  conditions {
+  condition {
     host_header {
       values = ["blue.example.com"]
     }
   }
 
-  actions {
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.blue_target_group.arn
   }

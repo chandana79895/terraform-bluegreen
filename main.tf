@@ -163,22 +163,50 @@ resource "aws_autoscaling_policy" "scale_green_up" {
   autoscaling_group_name  = aws_autoscaling_group.green_asg.name
 }
 
-# Traffic shift: gradually forward traffic to Green once it’s healthy
 resource "aws_lb_listener_rule" "traffic_shift_rule" {
   listener_arn = aws_lb_listener.web_listener.arn
+  priority     = 100  # Set a priority for the rule
 
-  condition {
-    field  = "path-pattern"
-    values = ["/"]  # Match all paths (or adjust as necessary)
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.blue_target_group.arn
+    weight           = 100  # Initially route all traffic to the blue target group
   }
 
   action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.green_target_group.arn
+    weight           = 0  # Initially route no traffic to the green target group
   }
 
-  priority = 1
+  condition {
+    field  = "host-header"
+    values = ["*"]  # This condition matches all hosts (adjust as needed)
+  }
 }
+
+resource "aws_lb_listener_rule" "traffic_shift_green" {
+  listener_arn = aws_lb_listener.web_listener.arn
+  priority     = 200  # Set a lower priority for green
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.blue_target_group.arn
+    weight           = 0  # No traffic to the blue target group
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.green_target_group.arn
+    weight           = 100  # Route all traffic to the green target group when it's ready
+  }
+
+  condition {
+    field  = "host-header"
+    values = ["*"]  # This condition matches all hosts (adjust as needed)
+  }
+}
+
 
 # Outputs
 output "load_balancer_dns" {

@@ -21,7 +21,7 @@ data "aws_subnet" "subnet_b" {
 
 # Security Group
 resource "aws_security_group" "web_sg" {
-  name        = "web-sg"
+  name        = "web-sg-name"
   description = "Allow HTTP and SSH traffic"
   vpc_id      = data.aws_vpc.selected.id
 
@@ -61,7 +61,7 @@ resource "aws_lb" "web_lb" {
 
 # Target Groups
 resource "aws_lb_target_group" "blue_target_group" {
-  name     = "blue-target-group"
+  name     = "blue-target-group-1"
   port     = 80
   protocol = "HTTP"
   vpc_id   = data.aws_vpc.selected.id
@@ -77,7 +77,7 @@ resource "aws_lb_target_group" "blue_target_group" {
 }
 
 resource "aws_lb_target_group" "green_target_group" {
-  name     = "green-target-group"
+  name     = "green-target-group-2"
   port     = 80
   protocol = "HTTP"
   vpc_id   = data.aws_vpc.selected.id

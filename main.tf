@@ -111,6 +111,7 @@ resource "aws_launch_configuration" "blue_launch_config" {
   instance_type = "t2.micro"
   key_name      = "Fortress-Automation-check" # Replace with your key pair
   security_groups = [aws_security_group.web_sg.id]
+  associate_public_ip_address = true
 
   user_data = <<-EOF
               #!/bin/bash
@@ -132,6 +133,7 @@ resource "aws_launch_configuration" "green_launch_config" {
   instance_type = "t2.micro"
   key_name      = "Fortress-Automation-check" # Replace with your key pair
   security_groups = [aws_security_group.web_sg.id]
+  associate_public_ip_address = true
 
   user_data = <<-EOF
               #!/bin/bash

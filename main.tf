@@ -7,10 +7,6 @@ data "aws_vpc" "selected" {
   id = "vpc-084570e9d3d7c0f8d" # Replace with your VPC ID
 }
 
-data "aws_subnet" "selected" {
-  vpc_id = data.aws_vpc.selected.id
-}
-
 data "aws_subnet" "subnet_a" {
   vpc_id             = data.aws_vpc.selected.id
   availability_zone  = "us-east-1"

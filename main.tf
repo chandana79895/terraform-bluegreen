@@ -10,7 +10,7 @@ data "aws_vpc" "selected" {
 # Subnet Configuration (Two subnets in different AZs)
 data "aws_subnet" "subnet_a" {
   vpc_id             = data.aws_vpc.selected.id
-  availability_zone  = "us-east-1"
+  availability_zone  = "us-east-1b"
   cidr_block         = "10.0.16.0/20"  # Adjust with your VPC's available CIDR
 }
 

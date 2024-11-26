@@ -24,11 +24,12 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }} 
 
-    - name: validating code
-      run: terraform validate    
-
     - name: Initialize Terraform
       run: terraform init  
+
+    - name: validating code
+      run: terraform validate    
+  
 
     - name: Plan Terraform changes
       run: terraform plan

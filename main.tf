@@ -21,7 +21,7 @@ data "aws_subnet" "subnet_b" {
 
 # Security Group
 resource "aws_security_group" "web_sg" {
-  name        = "web-sg-name"
+  name        = "web-sg-name1"
   description = "Allow HTTP and SSH traffic"
   vpc_id      = data.aws_vpc.selected.id
 

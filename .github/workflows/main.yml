@@ -61,6 +61,9 @@ jobs:
       - name: Initialize Terraform
         run: terraform init
 
+      - name: validation of the code
+        run: terraform validate  
+
       # Apply Terraform to deploy the blue environment
       - name: Deploy Blue Environment
         run: terraform apply -auto-approve -var="environment=blue"

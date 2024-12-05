@@ -190,11 +190,6 @@ resource "aws_instance" "web_instance" {
   }
 }
 
-# Output Public IP of EC2 instances dynamically
-output "instance_public_ip" {
-  value = aws_instance.web_instance.*.public_ip
-}
-
 # ALB Listener
 resource "aws_lb_listener" "web_listener" {
   load_balancer_arn = aws_lb.web_lb.arn

@@ -1,4 +1,5 @@
 name: Deploy to AWS
+
 on:
   push:
     branches:
@@ -44,13 +45,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Export AWS Environment Variables
+      # Verify AWS credentials
+      - name: Verify AWS CLI Setup
+        run: |
+          aws sts get-caller-identity
+
+      # Export AWS credentials explicitly for Terraform
+      - name: Export AWS Credentials
         run: |
           echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
           echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
           echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
-        
-  
+
   deploy-blue:
     runs-on: ubuntu-latest
     needs: setup
@@ -68,7 +74,8 @@ jobs:
       - name: Initialize Terraform
         run: terraform init
 
-      - name: validation of the code
+      # Validate Terraform configuration
+      - name: Validate Terraform Configuration
         run: terraform validate  
 
       # Apply Terraform to deploy the blue environment
@@ -90,12 +97,12 @@ jobs:
       # Verify blue deployment using the public IP
       - name: Verify Blue Deployment
         run: |
-          curl -f http://${{ env.PUBLIC_IP }}/index.html  # Replace with actual endpoint for verification
+          curl -f http://${{ env.PUBLIC_IP }}/index.html
 
   switch-to-green:
     runs-on: ubuntu-latest
     needs: deploy-blue
-    if: success()  # Run this job only if the blue deployment was successful
+    if: success()
 
     steps:
       - name: Checkout code
@@ -129,12 +136,12 @@ jobs:
       # Verify green deployment using the green environment's public IP
       - name: Verify Green Deployment
         run: |
-          curl -f http://${{ env.GREEN_PUBLIC_IP }}/index.html  # Replace with actual endpoint for verification
+          curl -f http://${{ env.GREEN_PUBLIC_IP }}/index.html
 
   update-load-balancer:
     runs-on: ubuntu-latest
     needs: switch-to-green
-    if: success()  # Run this job only if the green environment is successfully deployed
+    if: success()
 
     steps:
       - name: Checkout code
@@ -153,7 +160,7 @@ jobs:
       - name: Update Load Balancer to Green
         run: terraform apply -auto-approve -var="switch_to_green=true"
 
-      # Optionally, add a health check or verification here to ensure that traffic is routed correctly
+      # Optionally, add a health check or verification here
       - name: Verify Load Balancer Update
         run: |
-          curl -f http://${{ env.GREEN_LOAD_BALANCER_DNS }}/index.html  # Check if the load balancer is routing traffic to the green environment
+          curl -f http://${{ env.GREEN_LOAD_BALANCER_DNS }}/index.html

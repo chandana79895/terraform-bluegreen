@@ -31,7 +31,7 @@ jobs:
             sudo ./aws/install
           else
             echo "AWS CLI found, updating..."
-            sudo aws/install --update
+            sudo ./aws/install --update
           fi
 
       # Configure AWS credentials (set these in GitHub Secrets)

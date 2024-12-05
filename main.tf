@@ -66,7 +66,7 @@ variable "environment" {
 # Launch Configuration for EC2 instances with key pair (Blue Environment)
 resource "aws_launch_configuration" "blue_config" {
   name = "blue-launch-configuration-${replace(timestamp(), ":", "")}"
-  image_id      = data.aws_ami.latest_ubuntu.id  # Dynamically fetch AMI ID
+  image_id      = data.aws_ami.latest_ubuntu.id
   instance_type = "t2.micro"
   security_groups = [aws_security_group.web_sg.id]
   key_name      = "Fortress-Automation-check"
@@ -85,15 +85,16 @@ resource "aws_launch_configuration" "blue_config" {
     create_before_destroy = true
   }
 
-  tags = {
-    Name = "${var.environment}-web-instance"
+  tag {
+    key                 = "Name"
+    value               = "${var.environment}-web-instance"
+    propagate_at_launch = true
   }
 }
 
-# Launch Configuration for EC2 instances with key pair (Green Environment)
 resource "aws_launch_configuration" "green_config" {
   name = "green-launch-configuration-${replace(timestamp(), ":", "")}"
-  image_id      = data.aws_ami.latest_ubuntu.id  # Dynamically fetch AMI ID
+  image_id      = data.aws_ami.latest_ubuntu.id
   instance_type = "t2.micro"
   security_groups = [aws_security_group.web_sg.id]
   key_name      = "Fortress-Automation-check"
@@ -112,20 +113,23 @@ resource "aws_launch_configuration" "green_config" {
     create_before_destroy = true
   }
 
-  tags = {
-    Name = "${var.environment}-web-instance"
+  tag {
+    key                 = "Name"
+    value               = "${var.environment}-web-instance"
+    propagate_at_launch = true
   }
 }
 
+
 # Auto Scaling Group for blue-green deployment
-resource "aws_autoscaling_group" "asg" {
+resource "aws_autoscaling_group" "green_asg" {
   desired_capacity     = 1
   max_size             = 2
   min_size             = 1
   vpc_zone_identifier  = [data.aws_subnet.subnet_a.id, data.aws_subnet.subnet_b.id]
 
   # Switch between Blue and Green configurations based on deployment
-  launch_configuration = aws_launch_configuration.blue_config.id  # Initially blue, can be switched to green
+  launch_configuration = aws_launch_configuration.green_config.id  # Green config
 
   health_check_type          = "EC2"
   health_check_grace_period = 300
@@ -135,6 +139,7 @@ resource "aws_autoscaling_group" "asg" {
     create_before_destroy = true
   }
 }
+
 
 # Elastic Load Balancer to distribute traffic between blue and green instances
 resource "aws_lb" "web_lb" {
@@ -161,46 +166,27 @@ resource "aws_lb_target_group" "green_target_group" {
   vpc_id   = data.aws_vpc.selected.id
 }
 
-# Create EC2 instances with dynamic IP assignment
-resource "aws_instance" "web_instance" {
-  count = 1
-  ami           = data.aws_ami.latest_ubuntu.id  # Dynamically fetch AMI ID
-  instance_type = "t2.micro"
-  security_groups = [aws_security_group.web_sg.id]
-  subnet_id     = data.aws_subnet.subnet_a.id
-  associate_public_ip_address = true
-  key_name      = "Fortress-Automation-check"
-
-  user_data = <<-EOF
-              #!/bin/bash
-              sudo apt update -y
-              sudo apt upgrade -y
-              sudo apt install -y apache2
-              echo "Hello from Apache Web Server - Sample app for testing" | sudo tee /var/www/html/index.html
-              sudo systemctl start apache2
-              sudo systemctl enable apache2
-              EOF
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  tags = {
-    Name = "WebInstance"
-  }
-}
-
 # ALB Listener
-resource "aws_lb_listener" "web_listener" {
-  load_balancer_arn = aws_lb.web_lb.arn
-  port              = 80
-  protocol          = "HTTP"
+resource "aws_lb_listener_rule" "traffic_shift_rule" {
+  listener_arn = aws_lb_listener.web_listener.arn
+  priority     = 100  # Set a priority for the rule
 
-  default_action {
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.blue_target_group.arn
   }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.green_target_group.arn
+  }
+
+  condition {
+    field  = "path-pattern"
+    values = ["/green/*"]
+  }
 }
+
 
 # Step Scaling Policy to scale Green ASG once Blue is healthy
 resource "aws_autoscaling_policy" "scale_green_up" {

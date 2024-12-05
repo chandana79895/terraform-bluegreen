@@ -19,24 +19,22 @@ jobs:
         with:
           terraform_version: "1.4.0"  # Use your desired Terraform version
 
-      # Install or Update AWS CLI
-      - name: Install or Update AWS CLI
+      # Remove pre-existing AWS CLI installation and Install AWS CLI
+      - name: Remove and Install AWS CLI
         run: |
-          # Check if AWS CLI is installed, and update if necessary
-          if ! command -v aws &> /dev/null
+          # Remove pre-existing AWS CLI installation if it exists
+          if command -v aws &> /dev/null
           then
-            echo "AWS CLI not found, installing..."
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip awscliv2.zip
-            sudo ./aws/install
-          else
-            echo "AWS CLI found, updating..."
-            # Update AWS CLI
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip awscliv2.zip
-            cd aws
-            sudo ./install
+            echo "Removing pre-existing AWS CLI installation..."
+            sudo rm -rf /usr/local/aws-cli
+            sudo rm -rf /usr/local/bin/aws
           fi
+
+          # Install AWS CLI
+          echo "Installing AWS CLI..."
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
 
       # Configure AWS credentials (set these in GitHub Secrets)
       - name: Configure AWS credentials

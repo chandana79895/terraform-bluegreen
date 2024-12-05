@@ -10,7 +10,7 @@ data "aws_vpc" "selected" {
 # Subnet Configuration
 data "aws_subnet" "subnet_a" {
   vpc_id            = data.aws_vpc.selected.id
-  availability_zone = "us-east-1"
+  availability_zone = "us-east-1b"
   cidr_block        = "10.0.16.0/20"
 }
 
@@ -51,12 +51,20 @@ resource "aws_security_group" "web_sg" {
 # Fetch latest Ubuntu AMI
 data "aws_ami" "latest_ubuntu" {
   most_recent = true
-  owners      = ["099720109477"]
+
   filter {
     name   = "name"
-    values = ["ubuntu*-x86_64-generic*"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
   }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  owners = ["099720109477"] # Canonical's AWS account ID
 }
+
 
 variable "environment" {
   description = "The environment to deploy (blue or green)"

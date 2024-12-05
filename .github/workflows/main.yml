@@ -31,7 +31,11 @@ jobs:
             sudo ./aws/install
           else
             echo "AWS CLI found, updating..."
-            sudo ./aws/install --update
+            # Update AWS CLI
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            cd aws
+            sudo ./install
           fi
 
       # Configure AWS credentials (set these in GitHub Secrets)

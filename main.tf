@@ -1,30 +1,30 @@
 provider "aws" {
-  region = "us-east-1"  # Adjust region if necessary
+  region = "us-east-1"
 }
 
 # VPC Configuration
 data "aws_vpc" "selected" {
-  id = "vpc-084570e9d3d7c0f8d"  # Use your existing VPC ID
+  id = "vpc-084570e9d3d7c0f8d"
 }
 
-# Subnet Configuration (Use an existing subnet from the selected VPC)
+# Subnet Configuration
 data "aws_subnet" "subnet_a" {
-  vpc_id             = data.aws_vpc.selected.id
-  availability_zone  = "us-east-1"
-  cidr_block         = "10.0.16.0/20"  # Adjust with your VPC's available CIDR
+  vpc_id            = data.aws_vpc.selected.id
+  availability_zone = "us-east-1"
+  cidr_block        = "10.0.16.0/20"
 }
 
 data "aws_subnet" "subnet_b" {
-  vpc_id             = data.aws_vpc.selected.id
-  availability_zone  = "us-east-1a"
-  cidr_block         = "10.0.0.0/20"  # Adjust with your VPC's available CIDR
+  vpc_id            = data.aws_vpc.selected.id
+  availability_zone = "us-east-1a"
+  cidr_block        = "10.0.0.0/20"
 }
 
-# Security Group for EC2 instance (Make sure this is in the correct VPC)
+# Security Group Configuration
 resource "aws_security_group" "web_sg" {
   name_prefix = "web_sg"
   description = "Allow HTTP traffic"
-  vpc_id      = data.aws_vpc.selected.id  # Reference the correct VPC
+  vpc_id      = data.aws_vpc.selected.id
 
   ingress {
     from_port   = 80
@@ -37,7 +37,7 @@ resource "aws_security_group" "web_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Allow SSH from anywhere (0.0.0.0/0)
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -48,13 +48,13 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# Fetch the latest AMI ID dynamically (Ubuntu in this example)
+# Fetch latest Ubuntu AMI
 data "aws_ami" "latest_ubuntu" {
   most_recent = true
-  owners      = ["099720109477"]  # Ubuntu's official account ID
+  owners      = ["099720109477"]
   filter {
     name   = "name"
-    values = ["ubuntu*-x86_64-generic*"]  # Filter for Ubuntu AMIs
+    values = ["ubuntu*-x86_64-generic*"]
   }
 }
 
@@ -63,13 +63,14 @@ variable "environment" {
   type        = string
 }
 
-# Launch Configuration for EC2 instances with key pair (Blue Environment)
+# Launch Configuration for Blue Environment
 resource "aws_launch_configuration" "blue_config" {
-  name = "blue-launch-configuration-${replace(timestamp(), ":", "")}"
-  image_id      = data.aws_ami.latest_ubuntu.id
-  instance_type = "t2.micro"
-  security_groups = [aws_security_group.web_sg.id]
-  key_name      = "Fortress-Automation-check"
+  name              = "blue-launch-configuration-${replace(timestamp(), ":", "")}"
+  image_id          = data.aws_ami.latest_ubuntu.id
+  instance_type     = "t2.micro"
+  security_groups   = [aws_security_group.web_sg.id]
+  key_name          = "Fortress-Automation-check"
+  associate_public_ip_address = true
 
   user_data = <<-EOF
               #!/bin/bash
@@ -84,20 +85,16 @@ resource "aws_launch_configuration" "blue_config" {
   lifecycle {
     create_before_destroy = true
   }
-
-  tag {
-    key                 = "Name"
-    value               = "${var.environment}-web-instance"
-    propagate_at_launch = true
-  }
 }
 
+# Launch Configuration for Green Environment
 resource "aws_launch_configuration" "green_config" {
-  name = "green-launch-configuration-${replace(timestamp(), ":", "")}"
-  image_id      = data.aws_ami.latest_ubuntu.id
-  instance_type = "t2.micro"
-  security_groups = [aws_security_group.web_sg.id]
-  key_name      = "Fortress-Automation-check"
+  name              = "green-launch-configuration-${replace(timestamp(), ":", "")}"
+  image_id          = data.aws_ami.latest_ubuntu.id
+  instance_type     = "t2.micro"
+  security_groups   = [aws_security_group.web_sg.id]
+  key_name          = "Fortress-Automation-check"
+  associate_public_ip_address = true
 
   user_data = <<-EOF
               #!/bin/bash
@@ -112,6 +109,22 @@ resource "aws_launch_configuration" "green_config" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+# Auto Scaling Group
+resource "aws_autoscaling_group" "green_asg" {
+  desired_capacity     = 1
+  max_size             = 2
+  min_size             = 1
+  vpc_zone_identifier  = [data.aws_subnet.subnet_a.id, data.aws_subnet.subnet_b.id]
+  launch_configuration = aws_launch_configuration.green_config.id
+  health_check_type          = "EC2"
+  health_check_grace_period = 300
+  force_delete               = true
+
+  lifecycle {
+    create_before_destroy = true
+  }
 
   tag {
     key                 = "Name"
@@ -120,37 +133,32 @@ resource "aws_launch_configuration" "green_config" {
   }
 }
 
-
-# Auto Scaling Group for blue-green deployment
-resource "aws_autoscaling_group" "green_asg" {
-  desired_capacity     = 1
-  max_size             = 2
-  min_size             = 1
-  vpc_zone_identifier  = [data.aws_subnet.subnet_a.id, data.aws_subnet.subnet_b.id]
-
-  # Switch between Blue and Green configurations based on deployment
-  launch_configuration = aws_launch_configuration.green_config.id  # Green config
-
-  health_check_type          = "EC2"
-  health_check_grace_period = 300
-  force_delete               = true
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-
-# Elastic Load Balancer to distribute traffic between blue and green instances
+# Elastic Load Balancer
 resource "aws_lb" "web_lb" {
   name               = "web-lb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.web_sg.id]
-  subnets            = [data.aws_subnet.subnet_a.id, data.aws_subnet.subnet_b.id]  # Two subnets in different AZs
+  subnets            = [data.aws_subnet.subnet_a.id, data.aws_subnet.subnet_b.id]
 }
 
-# Target Group for Blue Environment
+# Load Balancer Listener
+resource "aws_lb_listener" "web_listener" {
+  load_balancer_arn = aws_lb.web_lb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "fixed-response"
+    fixed_response {
+      status_code = 200
+      content_type = "text/plain"
+      message_body = "OK"
+    }
+  }
+}
+
+# Load Balancer Target Groups
 resource "aws_lb_target_group" "blue_target_group" {
   name     = "blue-target-group"
   port     = 80
@@ -158,7 +166,6 @@ resource "aws_lb_target_group" "blue_target_group" {
   vpc_id   = data.aws_vpc.selected.id
 }
 
-# Target Group for Green Environment
 resource "aws_lb_target_group" "green_target_group" {
   name     = "green-target-group"
   port     = 80
@@ -166,10 +173,10 @@ resource "aws_lb_target_group" "green_target_group" {
   vpc_id   = data.aws_vpc.selected.id
 }
 
-# ALB Listener
+# ALB Listener Rule
 resource "aws_lb_listener_rule" "traffic_shift_rule" {
   listener_arn = aws_lb_listener.web_listener.arn
-  priority     = 100  # Set a priority for the rule
+  priority     = 100
 
   action {
     type             = "forward"
@@ -182,17 +189,18 @@ resource "aws_lb_listener_rule" "traffic_shift_rule" {
   }
 
   condition {
-    field  = "path-pattern"
-    values = ["/green/*"]
+    path_pattern {
+      values = ["/green/*"]
+    }
   }
 }
 
-
-# Step Scaling Policy to scale Green ASG once Blue is healthy
+# Auto Scaling Policy
 resource "aws_autoscaling_policy" "scale_green_up" {
   name                   = "scale-green-up"
   scaling_adjustment     = 1
   adjustment_type        = "ChangeInCapacity"
   cooldown               = 300
+  estimated_instance_warmup = 180
   autoscaling_group_name  = aws_autoscaling_group.green_asg.name
 }
